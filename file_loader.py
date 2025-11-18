@@ -87,11 +87,14 @@ def load_lsfit_header(path: Path) -> Dict:
 
 
 def _consume_table(
-    lines: List[str], start_idx: int
-) -> Tuple[Dict, int]:
+    lines: List[str], start_idx: int, expected_cols: Optional[int] = None
+) -> Tuple[Dict, int, List[str]]:
     headers = re.sub(r"^[! ]+", "", lines[start_idx]).split()
     rows = []
     idx = start_idx + 1
+    warnings: List[str] = []
+    # Use expected column count if provided, else infer from headers (minus any trailing label column)
+    exp = expected_cols if expected_cols is not None else len(headers)
     while idx < len(lines):
         raw = lines[idx]
         if not raw.strip():
@@ -104,27 +107,34 @@ def _consume_table(
         nums = _parse_numbers(raw)
         if not nums:
             break
+        if exp and len(nums) < exp:
+            warnings.append(f"Row {idx+1} truncated: expected {exp} numbers, found {len(nums)}")
         suffix = raw[raw.rfind(str(nums[-1])) + len(str(nums[-1])) :].strip()
         row = {"values": nums}
         if suffix:
             row["label"] = suffix
         rows.append(row)
         idx += 1
-    return {"headers": headers, "rows": rows}, idx
+    return {"headers": headers, "rows": rows}, idx, warnings
 
 
 def load_lsf(path: Path) -> Dict:
     lines = _read_lines(path)
     tables = []
+    warnings: List[str] = []
     idx = 0
     while idx < len(lines):
         line = lines[idx]
         if "ALPHA" in line.upper() and line.lstrip().startswith("!"):
-            table, idx = _consume_table(lines, idx)
+            # Expect at least one numeric header to estimate column count
+            headers = re.sub(r"^[! ]+", "", lines[idx]).split()
+            expected_cols = max(len(headers) - 1, 0)  # minus potential label column
+            table, idx, w = _consume_table(lines, idx, expected_cols if expected_cols else None)
+            warnings.extend([f"{path}: {msg}" for msg in w])
             tables.append(table)
         else:
             idx += 1
-    return {"tables": tables}
+    return {"tables": tables, "warnings": warnings}
 
 
 def load_idb(path: Path) -> Dict:
