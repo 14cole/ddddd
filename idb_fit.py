@@ -525,14 +525,6 @@ def fit_debye_triple(
     epsv, fix_v = apply_ctrl(6, epsv_guess)
     sige, fix_s = apply_ctrl(7, sige_guess)
 
-    params = [fres1, deps1, fre2, deps2, fre3, deps3, epsv, sige]
-    fixed = [fix_f1, fix_d1, fix_f2, fix_d2, fix_f3, fix_d3, fix_v, fix_s]
-
-    kx = max(len(f) // max(tuning.kx_div, 1), 1)
-    f_s = f[::kx] if len(f) else np.array([1.0])
-    eps_s = eps[::kx] if len(eps) else np.array([1.0])
-    sample_count = max(len(f_s), 1)
-
     def clamp_fres(v: float) -> float:
         return min(max(v, tuning.fres_min), tuning.fres_max)
 
@@ -544,6 +536,20 @@ def fit_debye_triple(
 
     def clamp_sige(v: float) -> float:
         return min(max(v, tuning.sige_min), tuning.sige_max)
+
+    # Clamp initial seeds to respect tuning bounds before iteration/freeze takes effect.
+    fres1, fre2, fre3 = clamp_fres(fres1), clamp_fres(fre2), clamp_fres(fre3)
+    deps1, deps2, deps3 = clamp_deps(deps1), clamp_deps(deps2), clamp_deps(deps3)
+    epsv = clamp_epsv(epsv)
+    sige = clamp_sige(sige)
+
+    params = [fres1, deps1, fre2, deps2, fre3, deps3, epsv, sige]
+    fixed = [fix_f1, fix_d1, fix_f2, fix_d2, fix_f3, fix_d3, fix_v, fix_s]
+
+    kx = max(len(f) // max(tuning.kx_div, 1), 1)
+    f_s = f[::kx] if len(f) else np.array([1.0])
+    eps_s = eps[::kx] if len(eps) else np.array([1.0])
+    sample_count = max(len(f_s), 1)
 
     step_funcs = [
         lambda val, pf: pf * val,
@@ -886,21 +892,6 @@ def fit_debye_lorentz(
     epsv, fixv = _apply_ctrl(6, epsv_default)
     sige, fixs = _apply_ctrl(7, sige_default)
 
-    params = [fres1, deps1, gamm1, fres2, deps2, gamm2, epsv, sige]
-    fixed = [fixf1, fixd1, fixg1, fixf2, fixd2, fixg2, fixv, fixs]
-
-    def _obj_sum(pvec: Sequence[float], fvals: np.ndarray, epsvals: np.ndarray) -> float:
-        model = lorentz.debye_lorentz_combo(
-            fvals, pvec[0], pvec[1], pvec[2], pvec[3], pvec[4], pvec[5], pvec[6], pvec[7]
-        )
-        diff = model - epsvals
-        return float(np.sum(diff.real**2 + diff.imag**2))
-
-    kx = max(len(f) // max(tuning.kx_div, 1), 1)
-    f_s = f[::kx] if len(f) else np.array([1.0])
-    eps_s = eps[::kx] if len(eps) else np.array([1.0 + 0j])
-    sample_count = max(len(f_s), 1)
-
     def _clamp_fres(val: float) -> float:
         return min(max(val, tuning.fres_min), tuning.fres_max)
 
@@ -918,6 +909,28 @@ def fit_debye_lorentz(
 
     def _clamp_sige(val: float) -> float:
         return min(max(val, tuning.sige_min), tuning.sige_max)
+
+    # Clamp seeds to tuning ranges before iteration.
+    fres1, fres2 = _clamp_fres(fres1), _clamp_fres(fres2)
+    deps1, deps2 = _clamp_deps(deps1), _clamp_deps(deps2)
+    gamm1, gamm2 = _clamp_gamma(gamm1), _clamp_gamma(gamm2)
+    epsv = _clamp_epsv(epsv)
+    sige = _clamp_sige(sige)
+
+    params = [fres1, deps1, gamm1, fres2, deps2, gamm2, epsv, sige]
+    fixed = [fixf1, fixd1, fixg1, fixf2, fixd2, fixg2, fixv, fixs]
+
+    def _obj_sum(pvec: Sequence[float], fvals: np.ndarray, epsvals: np.ndarray) -> float:
+        model = lorentz.debye_lorentz_combo(
+            fvals, pvec[0], pvec[1], pvec[2], pvec[3], pvec[4], pvec[5], pvec[6], pvec[7]
+        )
+        diff = model - epsvals
+        return float(np.sum(diff.real**2 + diff.imag**2))
+
+    kx = max(len(f) // max(tuning.kx_div, 1), 1)
+    f_s = f[::kx] if len(f) else np.array([1.0])
+    eps_s = eps[::kx] if len(eps) else np.array([1.0 + 0j])
+    sample_count = max(len(f_s), 1)
 
     def _scan(idx: int, step: float, clamp_func):
         nonlocal params, best_sum
