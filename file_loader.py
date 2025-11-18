@@ -60,6 +60,9 @@ def load_lst(path: Path) -> Dict:
         stem = data_lines[i + 1].strip()
         entries.append((alpha, stem))
 
+    if len(entries) != nalpha:
+        raise ValueError(f"{path} expected {nalpha} entries but found {len(entries)}")
+
     return {"nalphas": nalpha, "idbkode": idbkode, "entries": entries}
 
 
