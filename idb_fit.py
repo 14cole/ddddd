@@ -382,12 +382,22 @@ def fit_debye_double(
         gam2, fix_g2 = apply_ctrl(5, gamma_default)
     else:
         fres_span = (float(f.max()) - float(f.min())) / 3.0 if len(f) else 1.0
-        fre1, fix_f1 = apply_ctrl(0, fres_span if fres_span > 0 else 1.0)
+        fres_span = fres_span if fres_span > 0 else 1.0
+        fre1, fix_f1 = apply_ctrl(0, fres_span)
         dep1, fix_d1 = apply_ctrl(1, deps_span / 2.0)
         gam1, fix_g1 = apply_ctrl(2, gamma_default)
-        fre2, fix_f2 = apply_ctrl(3, 2 * (fres_span if fres_span > 0 else 1.0))
+        fre2, fix_f2 = apply_ctrl(3, 2 * fres_span)
         dep2, fix_d2 = apply_ctrl(4, deps_span / 2.0)
         gam2, fix_g2 = apply_ctrl(5, gamma_default)
+
+    def clamp_gamma_seed(val: float) -> float:
+        g = abs(val)
+        if g < 1e-4:
+            g = 0.0
+        return min(max(g, tuning.gamma_min), tuning.gamma_max)
+
+    gam1 = clamp_gamma_seed(gam1)
+    gam2 = clamp_gamma_seed(gam2)
 
     epsv, fix_v = apply_ctrl(6, epsv_guess)
     sige, fix_s = apply_ctrl(7, sige_guess)
