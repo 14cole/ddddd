@@ -17,11 +17,11 @@ from typing import Callable, Dict, List, Sequence, Tuple
 
 import numpy as np
 
-import file_loader
-import idb_fit
-import idb_poly
-import debye
-import lorentz
+from . import file_loader
+from . import idb_fit
+from . import idb_poly
+from . import debye
+from . import lorentz
 
 
 CEPS_EXT = {1: ".dbe", 2: ".lne", 3: ".2de", 4: ".2le", 5: ".3de", 6: ".dle"}
@@ -299,6 +299,9 @@ def generate_fits_from_lst(
 
     idbke = idbkode // 10
     idbkm = idbkode % 10
+    for digit, label in ((idbke, "CEPS"), (idbkm, "CMU")):
+        if digit not in CEPS_EXT and digit not in CMU_EXT and not (label == "CMU" and digit == 0):
+            raise ValueError(f"{lst_path} has unsupported {label} IDB digit {digit} (IDBKODE {idbkode})")
 
     created: Dict[str, List[Path]] = {"ceps": [], "cmu": []}
     combined_rows_ce: List[Tuple[float, List[float], float, str]] = []
