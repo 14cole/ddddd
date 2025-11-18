@@ -476,6 +476,18 @@ def fit_debye_triple(
     epsv_guess = float(epsr[-1]) if len(epsr) else 1.0
     sige_guess = 1e-8
 
+    # Initialize defaults so seeds/fix flags always exist even with unusual controls.
+    fres_span = (float(f.max()) - float(f.min())) / 4.0 if len(f) else 1.0
+    if fres_span <= 0:
+        fres_span = 1.0
+    fres1 = fres_peak or fres_span
+    deps1 = deps_span / 3.0
+    fre2 = 2 * fres_span
+    deps2 = deps_span / 3.0
+    fre3 = 3 * fres_span
+    deps3 = deps_span / 3.0
+    fix_f1 = fix_d1 = fix_f2 = fix_d2 = fix_f3 = fix_d3 = False
+
     def apply_ctrl(idx: int, guess: float) -> tuple[float, bool]:
         c = ctrl[idx]
         if abs(c - 1e-8) < 1e-12:
@@ -485,10 +497,6 @@ def fit_debye_triple(
         if c < 0:
             return abs(float(c)), False
         return guess, False
-
-    fres_span = (float(f.max()) - float(f.min())) / 4.0 if len(f) else 1.0
-    if fres_span <= 0:
-        fres_span = 1.0
 
     if abs(ctrl[4] - 1e-8) < 1e-12:
         fres1, fix_f1 = apply_ctrl(0, fres_peak or fres_span)
@@ -827,6 +835,16 @@ def fit_debye_lorentz(
     epsv_default = float(epsr[-1]) if len(epsr) else 1.0
     sige_default = 1e-8
 
+    # Start with sane defaults so variables are always initialized even if controls are odd.
+    fres1 = fres_peak or fres_default
+    deps1 = eps_span_full / 2.0
+    gamm1 = gamma_default
+    fres2 = fres_peak or (2 * fres_default)
+    deps2 = eps_span_full / 2.0
+    gamm2 = gamma_default
+    fixf1 = fixd1 = fixg1 = False
+    fixf2 = fixd2 = fixg2 = False
+
     def _apply_ctrl(idx: int, guess: float) -> tuple[float, bool]:
         c = ctrl[idx]
         if abs(c - 1e-8) < 1e-12:
@@ -841,9 +859,9 @@ def fit_debye_lorentz(
     freeze_lorentz = abs(ctrl[4] - 1e-8) < 1e-12
 
     if freeze_lorentz:
-        fres1, fixf1 = _apply_ctrl(0, fres_peak or fres_default)
+        fres1, fixf1 = _apply_ctrl(0, fres1)
         deps1, fixd1 = _apply_ctrl(1, eps_span_full)
-        gamm1, fixg1 = _apply_ctrl(2, gamma_default)
+        gamm1, fixg1 = _apply_ctrl(2, gamm1)
         # Lorentz leg forced to a negligible oscillator; Fortran also freezes its controls.
         fres2 = fres_peak or fres_default
         deps2 = 0.0
@@ -854,16 +872,16 @@ def fit_debye_lorentz(
         deps1 = 0.0
         gamm1 = gamma_default
         fixf1 = fixd1 = fixg1 = True
-        fres2, fixf2 = _apply_ctrl(3, fres_peak or (2 * fres_default))
+        fres2, fixf2 = _apply_ctrl(3, fres2)
         deps2, fixd2 = _apply_ctrl(4, eps_span_full)
-        gamm2, fixg2 = _apply_ctrl(5, gamma_default)
+        gamm2, fixg2 = _apply_ctrl(5, gamm2)
     else:
-        fres1, fixf1 = _apply_ctrl(0, fres_default)
+        fres1, fixf1 = _apply_ctrl(0, fres1)
         deps1, fixd1 = _apply_ctrl(1, eps_span_full / 2.0)
-        gamm1, fixg1 = _apply_ctrl(2, gamma_default)
-        fres2, fixf2 = _apply_ctrl(3, 2 * fres_default)
+        gamm1, fixg1 = _apply_ctrl(2, gamm1)
+        fres2, fixf2 = _apply_ctrl(3, fres2)
         deps2, fixd2 = _apply_ctrl(4, eps_span_full / 2.0)
-        gamm2, fixg2 = _apply_ctrl(5, gamma_default)
+        gamm2, fixg2 = _apply_ctrl(5, gamm2)
 
     epsv, fixv = _apply_ctrl(6, epsv_default)
     sige, fixs = _apply_ctrl(7, sige_default)
