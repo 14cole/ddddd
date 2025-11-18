@@ -10,13 +10,13 @@ from typing import Dict, List, Optional
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-import file_loader
-import debye
-import lorentz
-import idb_eval
-import idb_poly
-import idb_fit
-import fit_from_lst
+from Methods import file_loader
+from Methods import debye
+from Methods import lorentz
+from Methods import idb_eval
+from Methods import idb_poly
+from Methods import idb_fit
+from Methods import fit_from_lst
 
 try:
     import numpy as np
