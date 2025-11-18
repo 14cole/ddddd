@@ -22,8 +22,8 @@ from typing import Callable, List, Sequence, Tuple
 
 import numpy as np
 
-import debye
-import lorentz
+from . import debye
+from . import lorentz
 
 
 @dataclass
@@ -55,6 +55,7 @@ class FitTuning:
         if not d:
             return cls()
         kwargs = {}
+        int_fields = {"max_iter", "kx_div"}
         for field in (
             "pf_init",
             "max_iter",
@@ -73,7 +74,10 @@ class FitTuning:
             key = field.upper()
             if key in d:
                 try:
-                    kwargs[field] = float(d[key]) if "max_iter" not in key and "kx_div" not in key else int(float(d[key]))
+                    if field in int_fields:
+                        kwargs[field] = int(float(d[key]))
+                    else:
+                        kwargs[field] = float(d[key])
                 except Exception:
                     continue
         return cls(**kwargs)
@@ -801,9 +805,11 @@ def fit_debye_lorentz(
     eps_real: Sequence[float],
     eps_imag: Sequence[float],
     controls: Sequence[float] | None = None,
+    tuning: FitTuning | None = None,
 ) -> FitResult:
     f = np.asarray(f_ghz, dtype=float)
     eps = np.asarray(eps_real, dtype=float) + 1j * np.asarray(eps_imag, dtype=float)
+    tuning = tuning or FitTuning()
 
     ctrl = list(controls) if controls else []
     while len(ctrl) < 8:
@@ -872,28 +878,28 @@ def fit_debye_lorentz(
         diff = model - epsvals
         return float(np.sum(diff.real**2 + diff.imag**2))
 
-    kx = max(len(f) // 50, 1)
+    kx = max(len(f) // max(tuning.kx_div, 1), 1)
     f_s = f[::kx] if len(f) else np.array([1.0])
     eps_s = eps[::kx] if len(eps) else np.array([1.0 + 0j])
     sample_count = max(len(f_s), 1)
 
     def _clamp_fres(val: float) -> float:
-        return min(max(val, 1e-4), 999.9999)
+        return min(max(val, tuning.fres_min), tuning.fres_max)
 
     def _clamp_deps(val: float) -> float:
-        return min(max(val, 1e-4), 999.9999)
+        return min(max(val, tuning.deps_min), tuning.deps_max)
 
     def _clamp_gamma(val: float) -> float:
         g = abs(val)
         if g < 1e-4:
             g = 0.0
-        return min(g, 10.0)
+        return min(max(g, tuning.gamma_min), tuning.gamma_max)
 
     def _clamp_epsv(val: float) -> float:
-        return min(max(val, 0.0), 999.9999)
+        return min(max(val, tuning.epsv_min), tuning.epsv_max)
 
     def _clamp_sige(val: float) -> float:
-        return min(max(val, 0.0), 100.0)
+        return min(max(val, tuning.sige_min), tuning.sige_max)
 
     def _scan(idx: int, step: float, clamp_func):
         nonlocal params, best_sum
@@ -911,9 +917,9 @@ def fit_debye_lorentz(
         params = best_params
         best_sum = best_local
 
-    pf = 1e-2
+    pf = tuning.pf_init
     sf = 1.0
-    iter_max = 5000
+    iter_max = tuning.max_iter
     iter_count = 0
     best_sum = _obj_sum(params, f_s, eps_s)
     converged = False
